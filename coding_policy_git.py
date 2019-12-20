@@ -12,6 +12,17 @@ def binary(s):
     """return true if a string is binary data"""
     return bool(s and b'\0' in s)
 
+# for colored text, lifted from https://stackoverflow.com/questions/287871
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 # From coding_policy.py
 
 failure_message = '''
@@ -266,9 +277,11 @@ class checker:
                 if warning:
                     self.ui.warn('  (treating this error as a warning)\n')
                 else:
-                    self.ui.status('  (to skip this check, commit a trivial change to this file,\n'
-                                   '  and add the text "%r" to your commit comment)\n' %
-                                   magic)
+                    pass
+            	    ## this won't work with pre-commit, because the commit message is not available to the hook.
+                    #self.ui.status('  (to skip this check, commit a trivial change to this file,\n'
+                    #               '  and add the text "%r" to your commit comment)\n' %
+                    #               magic)
         
     def done(self):
         if self.violations:
@@ -279,15 +292,17 @@ class checker:
 
 class checker_ui:
     def __init__(self):
+        self.debug_flag = False
         pass
     def note(self,s):
         print s
     def debug(self,s):
-        print "debug",s
+        if self.debug_flag:
+            print s
     def warn(self,s):
-        print "warn",s
+        print bcolors.WARNING + s + bcolors.ENDC
     def status(self,s):
-        print "status",s
+        print s
 
 def pre_commit_check(repo, ui, checker, policies):
     for d in repo.index.diff(repo.head.commit):
@@ -295,32 +310,34 @@ def pre_commit_check(repo, ui, checker, policies):
             filename = d.a_path
             data = d.a_blob.data_stream.read()
             change_type = d.change_type
-            print "checking file", filename, "change_type",change_type,"bytes", len(data)
             file_checker.file(filename, data, "UNKNOWN")
+    file_checker.done()
 
-    print "violations found:", file_checker.violations
-    print "unimplemented, failing"
-    sys.exit(1)
+    sys.exit(file_checker.violations>0)
 
 if __name__ == "__main__":
-    print "this is coding_policy_git", "args", sys.argv
 
     parser = argparse.ArgumentParser(description="Linden coding policy checks")
     parser.add_argument("--pre-commit", action="store_true")
+    parser.add_argument("-d","--debug", action="store_true", default=False)
     args = parser.parse_args()
+
+    if args.debug:
+        print "this is coding_policy_git", "args", sys.argv
 
     cwd = os.getcwd()
     repo = Repo(cwd)
-    print repo
 
     policy_name = 'opensource'
     policies = policy_map[policy_name]
     ui = checker_ui()
+    ui.debug_flag = args.debug
     file_checker = checker(ui, None, policies)
 
     if args.pre_commit:
-        pre_commit_check(repo, ui, checker, policies)
+        pre_commit_check(repo, ui, file_checker, policies)
 
+        
     print "violations found:", file_checker.violations
     print "unimplemented, failing"
     sys.exit(1)

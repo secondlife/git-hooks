@@ -1,8 +1,13 @@
-#!C:/Python27/python.exe
+#!/usr/bin/env python
 
 import os
 import sys
-from git import Repo, Git
+try:
+    from git import Repo, Git # requires the gitpython package
+except:
+    print "this script requires the gitpython package"
+    sys.exit(1)
+    
 import re
 import argparse
 
@@ -12,7 +17,7 @@ def binary(s):
     """return true if a string is binary data"""
     return bool(s and b'\0' in s)
 
-# for colored text, lifted from https://stackoverflow.com/questions/287871
+# escape sequences for colored text, lifted from https://stackoverflow.com/questions/287871
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -42,7 +47,7 @@ def unix_line_endings(path, data):
         yield 'Windows line endings found'
 
 def windows_line_endings(path, data):
-    if not _binary(data) and re.search('(?<!\r)\n', data, re.MULTILINE):
+    if not binary(data) and re.search('(?<!\r)\n', data, re.MULTILINE):
         yield 'Unix line endings found'
 
 def copyright_needed(path, data):
@@ -162,7 +167,8 @@ common_policies = (
     ('require-leading-tabs', r'^([Mm]akefile|.*\.make)$', leading_tabs_required),
     ('valid-xml', r'.*\.xml$', valid_xml),
     ('valid-llsd', r'.*\.xml$', valid_llsd),
-    #('windows-path', r'', windows_friendly_path),
+    # Mercurial-specific, not clear whether it needs to be handled with git
+    #('windows-path', r'', windows_friendly_path), 
     ('unix-eol', lambda p: not is_windows_only_file(p), unix_line_endings),
     ('windows-eol', lambda p: is_windows_only_file(p), windows_line_endings),
     )
@@ -250,7 +256,7 @@ class checker:
             self.file(f, data, desc)
 
     def file(self, f, data, desc) :
-        self.ui.note('  checking %s\n' % f)
+        self.ui.debug('  checking %s\n' % f)
         for name, pat, policy in self.policies:
             try:
                 # pattern is a regular expression
@@ -282,9 +288,20 @@ class checker:
                     #self.ui.status('  (to skip this check, commit a trivial change to this file,\n'
                     #               '  and add the text "%r" to your commit comment)\n' %
                     #               magic)
-        
+
+    def files(self, files):
+        for f in files:
+            try:
+                with open(f,"r") as fh:
+                    data = fh.read()
+                    desc = "UNKNOWN"
+                    self.file(f, data, desc)
+            except:
+                self.ui.note("unable to read file %s" % (f))
+                
     def done(self):
         if self.violations:
+            self.ui.warn("%d violations found" % (self.violations))
             self.ui.status(failure_message)
         else:
             self.ui.status(success_message)
@@ -310,16 +327,17 @@ def pre_commit_check(repo, ui, checker, policies):
             filename = d.a_path
             data = d.a_blob.data_stream.read()
             change_type = d.change_type
-            file_checker.file(filename, data, "UNKNOWN")
-    file_checker.done()
-
-    sys.exit(file_checker.violations>0)
+            checker.file(filename, data, "UNKNOWN")
+    checker.done()
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Linden coding policy checks")
     parser.add_argument("--pre-commit", action="store_true")
     parser.add_argument("-d","--debug", action="store_true", default=False)
+    parser.add_argument("--all_files", action="store_true")
+    parser.add_argument("--policy")
+    parser.add_argument("files", nargs="*")
     args = parser.parse_args()
 
     if args.debug:
@@ -328,16 +346,41 @@ if __name__ == "__main__":
     cwd = os.getcwd()
     repo = Repo(cwd)
 
+    # TODO get policy
     policy_name = 'opensource'
+    if args.policy:
+        if args.policy in policy_map.keys():
+            policy_name = args.policy
+        else:
+            print "unrecognized policy", args.policy
+            sys.exit(1)
     policies = policy_map[policy_name]
+
     ui = checker_ui()
     ui.debug_flag = args.debug
-    file_checker = checker(ui, None, policies)
 
     if args.pre_commit:
-        pre_commit_check(repo, ui, file_checker, policies)
+        commit_checker = checker(ui, None, policies)
+        pre_commit_check(repo, ui, commit_checker, policies)
+        if commit_checker.violations:
+            ui.warn("pre-commit check failed")
+            sys.exit(1)
+        print "unimplemented, failing anyway"
+        sys.exit(1)
 
+    if args.all_files:
+        # check all managed files in the current working tree
+        g = Git(cwd)
+        rval = g.ls_files()
+        file_checker = checker(ui, None, policies)
+        file_checker.files(rval.split("\n"))
+        file_checker.done()
+        print "--all_file check violations found:", file_checker.violations
         
-    print "violations found:", file_checker.violations
-    print "unimplemented, failing"
-    sys.exit(1)
+    if args.files:
+        print "checking files from command line", args.files
+        file_checker = checker(ui, None, policies)
+        file_checker.files(args.files)
+        file_checker.done()
+        print "file check violations found:", file_checker.violations
+

@@ -268,7 +268,7 @@ class checker:
     def check_files(self, files):
         for f in files:
             try:
-                with open(f,"r") as fh:
+                with open(f,"rb") as fh:
                     data = fh.read()
                     self.check_file(f, data)
             except:
@@ -379,7 +379,7 @@ if __name__ == "__main__":
     if args.commit_msg:
         ui.debug("commit-msg check, file %s" % args.commit_msg)
         msg_checker = checker(ui, None, policies)
-        with open(args.commit_msg,"r") as fh:
+        with open(args.commit_msg,"rb") as fh:
             msg = fh.read()
             msg_checker.check_commit_msg(msg)
             errs = msg_checker.done()
@@ -398,7 +398,7 @@ if __name__ == "__main__":
             ui.warn("--all_file check violations found: %d" % (file_checker.violations))
         
     if args.files:
-        ui.note("checking files from command line" + ", ".join(args.files))
+        ui.note("checking files from command line " + ", ".join(args.files))
         file_checker = checker(ui, None, policies)
         file_checker.check_files(args.files)
         file_checker.done()

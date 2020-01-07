@@ -330,29 +330,63 @@ def pre_commit_check(repo, ui, checker, policies):
             checker.file(filename, data, "UNKNOWN")
     checker.done()
 
+valid_jira_projects = "BUG,DRTVWR,DRTSIM,DRTAPP,DRTDS,DRTDB,DRTCONF,DOC,ESCALATE,SEC,SL,MAINT,TOOL,WENG".split(",")
+
+def commit_msg_check(msg):
+    # check for valid JIRA links
+    found_jira = False
+    status = 0
+    for m in re.finditer(r'([a-zA-Z]+)-(\d+)', msg):
+        proj = m.group(1).upper()
+        if not proj in valid_jira_projects:
+            print "Commit message has unrecognized JIRA project", proj, "in", m.group()
+            status = 1
+        else:
+            found_jira = True
+    if not found_jira:
+        print "Commit message contains no valid JIRAs"
+        status = 1
+    return status
+        
+usage_message = '''
+Usage: coding_policy_git.py [--policy opensource|proprietary] [--pre-commit] [--all_files] [file...]
+--policy specifies the policy to use, defaults to opensource
+--all_files will check all managed files in the current working tree
+Any arguments at the end are treated as individual file names to check
+'''
+
+def usage():
+    print usage_message
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Linden coding policy checks")
     parser.add_argument("--pre-commit", action="store_true")
+    parser.add_argument("--commit-msg")
     parser.add_argument("-d","--debug", action="store_true", default=False)
     parser.add_argument("--all_files", action="store_true")
     parser.add_argument("--policy")
+    parser.add_argument("--usage", action="store_true")
     parser.add_argument("files", nargs="*")
     args = parser.parse_args()
 
     if args.debug:
         print "this is coding_policy_git", "args", sys.argv
 
+    if args.usage:
+        usage()
+        sys.exit(0)
+
     cwd = os.getcwd()
     repo = Repo(cwd)
 
-    # TODO get policy
+    # TODO get policy automatically
     policy_name = 'opensource'
     if args.policy:
         if args.policy in policy_map.keys():
             policy_name = args.policy
         else:
-            print "unrecognized policy", args.policy
+            print "unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map.keys()))
             sys.exit(1)
     policies = policy_map[policy_name]
 
@@ -365,8 +399,15 @@ if __name__ == "__main__":
         if commit_checker.violations:
             ui.warn("pre-commit check failed")
             sys.exit(1)
-        print "unimplemented, failing anyway"
-        sys.exit(1)
+
+    if args.commit_msg:
+        print "commit-msg check, file", args.commit_msg
+        with open(args.commit_msg,"r") as fh:
+            msg = fh.read()
+            status = commit_msg_check(msg)
+            if status:
+                ui.warn("commit-msg check failed")
+                sys.exit(1)
 
     if args.all_files:
         # check all managed files in the current working tree

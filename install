@@ -10,4 +10,4 @@ if [ ! -d .git/hooks ] || [ -e coding_policy_git.py ]; then
 fi
 #env
 echo "installing hooks in current repo",$PWD
-cp -v ${hook_path}/hooks/* .git/hooks
+cp -v ${hook_path}/hooks/{pre-commit,commit-msg} .git/hooks

@@ -1,5 +1,4 @@
 #!/bin/sh
 
 hook_path=${GIT_HOOK_REPO_PATH:-"../git-hooks"}
-echo $hook_path
 exec "${hook_path}/coding_policy_git.py" --commit-msg "$1"

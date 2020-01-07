@@ -239,23 +239,7 @@ class checker:
         self.violations = 0
         self.seen = set()
     
-    def revision(self, ctx):
-        desc = ctx.description()
-        for f in ctx.files():
-            # Only check the newest revision of a file. If the file is
-            # missing from the tip revision (due to having been
-            # deleted), skip it.
-            if f in self.seen or f not in self.tip or f not in ctx:
-                continue
-            data = ctx[f].data()
-            print "desc",desc,"data",data
-            self.seen.add(f)
-            if not data:
-                # File was deleted.
-                continue
-            self.file(f, data, desc)
-
-    def file(self, f, data, desc) :
+    def check_file(self, f, data) :
         self.ui.debug('  checking %s\n' % f)
         for name, pat, policy in self.policies:
             try:
@@ -268,10 +252,10 @@ class checker:
                     continue
             self.ui.debug('    '+name+'\n')
             for violation in policy(f, data):
-                magic = 'warn-on-failure:' + name
-                warning = magic in desc
-                if not warning:
-                    self.violations += 1
+                # Doesn't work with git; commit message not known during pre-commit check.
+                #magic = 'warn-on-failure:' + name
+                #warning = magic in desc
+                self.violations += 1
                 try:
                     line, violation = violation
                     msg = '%s:%d: %s' % (f, line, violation)
@@ -280,25 +264,33 @@ class checker:
                 if not msg.endswith('\n'):
                     msg += '\n'
                 self.ui.warn(msg)
-                if warning:
-                    self.ui.warn('  (treating this error as a warning)\n')
-                else:
-                    pass
-            	    ## this won't work with pre-commit, because the commit message is not available to the hook.
-                    #self.ui.status('  (to skip this check, commit a trivial change to this file,\n'
-                    #               '  and add the text "%r" to your commit comment)\n' %
-                    #               magic)
 
-    def files(self, files):
+    def check_files(self, files):
         for f in files:
             try:
                 with open(f,"r") as fh:
                     data = fh.read()
-                    desc = "UNKNOWN"
-                    self.file(f, data, desc)
+                    self.check_file(f, data)
             except:
                 self.ui.note("unable to read file %s" % (f))
                 
+    def check_commit_msg(self, msg):
+        # check for valid JIRA links
+        found_jira = False
+        status = 0
+        for m in re.finditer(r'([a-zA-Z]+)-(\d+)', msg):
+            proj = m.group(1).upper()
+            if not proj in valid_jira_projects:
+                self.ui.warn("Commit message has unrecognized JIRA project %s (in %s)" % (proj, m.group()))
+                self.violations += 1
+                status = 1
+            else:
+                found_jira = True
+        if not found_jira:
+            self.ui.warn("Commit message contains no valid JIRAs")
+            status = 1
+            self.violations += 1
+
     def done(self):
         if self.violations:
             self.ui.warn("%d violations found" % (self.violations))
@@ -327,27 +319,11 @@ def pre_commit_check(repo, ui, checker, policies):
             filename = d.a_path
             data = d.a_blob.data_stream.read()
             change_type = d.change_type
-            checker.file(filename, data, "UNKNOWN")
+            checker.check_file(filename, data)
     checker.done()
 
 valid_jira_projects = "BUG,DRTVWR,DRTSIM,DRTAPP,DRTDS,DRTDB,DRTCONF,DOC,ESCALATE,SEC,SL,MAINT,TOOL,WENG".split(",")
 
-def commit_msg_check(msg):
-    # check for valid JIRA links
-    found_jira = False
-    status = 0
-    for m in re.finditer(r'([a-zA-Z]+)-(\d+)', msg):
-        proj = m.group(1).upper()
-        if not proj in valid_jira_projects:
-            print "Commit message has unrecognized JIRA project", proj, "in", m.group()
-            status = 1
-        else:
-            found_jira = True
-    if not found_jira:
-        print "Commit message contains no valid JIRAs"
-        status = 1
-    return status
-        
 usage_message = '''
 Usage: coding_policy_git.py [--policy opensource|proprietary] [--pre-commit] [--all_files] [file...]
 --policy specifies the policy to use, defaults to opensource
@@ -380,18 +356,18 @@ if __name__ == "__main__":
     cwd = os.getcwd()
     repo = Repo(cwd)
 
+    ui = checker_ui()
+    ui.debug_flag = args.debug
+
     # TODO get policy automatically
     policy_name = 'opensource'
     if args.policy:
         if args.policy in policy_map.keys():
             policy_name = args.policy
         else:
-            print "unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map.keys()))
+            ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map.keys())))
             sys.exit(1)
     policies = policy_map[policy_name]
-
-    ui = checker_ui()
-    ui.debug_flag = args.debug
 
     if args.pre_commit:
         commit_checker = checker(ui, None, policies)
@@ -401,11 +377,13 @@ if __name__ == "__main__":
             sys.exit(1)
 
     if args.commit_msg:
-        print "commit-msg check, file", args.commit_msg
+        ui.debug("commit-msg check, file %s" % args.commit_msg)
+        msg_checker = checker(ui, None, policies)
         with open(args.commit_msg,"r") as fh:
             msg = fh.read()
-            status = commit_msg_check(msg)
-            if status:
+            msg_checker.check_commit_msg(msg)
+            errs = msg_checker.done()
+            if errs:
                 ui.warn("commit-msg check failed")
                 sys.exit(1)
 
@@ -414,14 +392,16 @@ if __name__ == "__main__":
         g = Git(cwd)
         rval = g.ls_files()
         file_checker = checker(ui, None, policies)
-        file_checker.files(rval.split("\n"))
+        file_checker.check_files(rval.split("\n"))
         file_checker.done()
-        print "--all_file check violations found:", file_checker.violations
+        if file_checker.violations:
+            ui.warn("--all_file check violations found: %d" % (file_checker.violations))
         
     if args.files:
-        print "checking files from command line", args.files
+        ui.note("checking files from command line" + ", ".join(args.files))
         file_checker = checker(ui, None, policies)
-        file_checker.files(args.files)
+        file_checker.check_files(args.files)
         file_checker.done()
-        print "file check violations found:", file_checker.violations
+        if file_checker.violations:
+            ui.warn("file check violations found: %d" % (file_checker.violations))
 

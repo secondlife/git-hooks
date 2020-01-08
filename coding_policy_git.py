@@ -192,6 +192,7 @@ policy_map = {
     'opensource' : opensource_policies
     }
 
+# (Following is old hg-based code, not currently supported)
 # We identify a repository that is subject to checking by whitelist,
 # based on the ID of the first changeset in that repository.  Here's a
 # simple way to obtain the necessary changeset ID:
@@ -322,11 +323,11 @@ def pre_commit_check(repo, ui, checker, policies):
             checker.check_file(filename, data)
     checker.done()
 
-valid_jira_projects = "BUG,DRTVWR,DRTSIM,DRTAPP,DRTDS,DRTDB,DRTCONF,DOC,ESCALATE,SEC,SL,MAINT,TOOL,WENG".split(",")
+valid_jira_projects = "BUG,DRTVWR,DRTSIM,DRTAPP,DRTDS,DRTDB,DRTCONF,DOC,ESCALATE,SEC,SL,TOOL,WENG".split(",")
 
 usage_message = '''
 Usage: coding_policy_git.py [--policy opensource|proprietary] [--pre-commit] [--all_files] [file...]
---policy specifies the policy to use, defaults to opensource
+--policy specifies the policy to use, defaults to opensource. Otherwise, if a .git_hooks_policy file is found in repo root, we will use the contents of that as policy.
 --all_files will check all managed files in the current working tree
 Any arguments at the end are treated as individual file names to check
 '''
@@ -353,7 +354,9 @@ if __name__ == "__main__":
         usage()
         sys.exit(0)
 
+    # find root of current repo
     cwd = os.getcwd()
+    cwd = Git(cwd).rev_parse("--show-toplevel")
     repo = Repo(cwd)
 
     ui = checker_ui()
@@ -362,11 +365,22 @@ if __name__ == "__main__":
     # TODO get policy automatically
     policy_name = 'opensource'
     if args.policy:
-        if args.policy in policy_map.keys():
-            policy_name = args.policy
-        else:
-            ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map.keys())))
-            sys.exit(1)
+        policy_name = args.policy
+    else:
+        # check for .git_hooks_policy in repo root
+        policy_file = os.path.join(repo.working_tree_dir,".git_hooks_policy")
+        if os.path.isfile(policy_file):
+            try:
+                with open(policy_file,"r") as fh:
+                    policy_name = fh.readline().split()[0]
+                    print "read policy_name", policy_name
+            except:
+                print "Unable to read policy name from", policy_file
+
+    if policy_name not in policy_map.keys():
+        ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map.keys())))
+        sys.exit(1)
+
     policies = policy_map[policy_name]
 
     if args.pre_commit:

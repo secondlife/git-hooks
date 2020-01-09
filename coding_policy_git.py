@@ -14,6 +14,7 @@ coding_policy_git.py [--policy opensource|proprietary] [--pre-commit] [--all_fil
 --all_files will check all managed files in the current working tree
 Any arguments at the end are treated as individual file names to check
 """
+from __future__ import print_function
 
 license = """\
 
@@ -44,7 +45,7 @@ import sys
 try:
     from git import Repo, Git # requires the gitpython package
 except:
-    print "this script requires the gitpython package"
+    print("this script requires the gitpython package")
     sys.exit(1)
     
 import re
@@ -57,7 +58,7 @@ def binary(s):
     return bool(s and b'\0' in s)
 
 # ANSI escape sequences for colored text, from https://stackoverflow.com/questions/287871
-class bcolors:
+class bcolors(object):
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -272,7 +273,7 @@ def last_line_should_have_eol(name) :
 # ================ End of rule selector methods ================
 
 # checker - this class actually runs each applicable policy check
-class checker:
+class checker(object):
     def __init__(self, ui, tip, policies):
         self.ui = ui
         self.tip = tip
@@ -340,19 +341,19 @@ class checker:
             self.ui.status(success_message)
         return self.violations
 
-class checker_ui:
+class checker_ui(object):
     def __init__(self):
         self.debug_flag = False
         pass
     def note(self,s):
-        print s
+        print(s)
     def debug(self,s):
         if self.debug_flag:
-            print s
+            print(s)
     def warn(self,s):
-        print bcolors.WARNING + s + bcolors.ENDC
+        print(bcolors.WARNING + s + bcolors.ENDC)
     def status(self,s):
-        print s
+        print(s)
 
 def pre_commit_check(repo, ui, checker, policies):
     for d in repo.index.diff(repo.head.commit):
@@ -366,7 +367,7 @@ def pre_commit_check(repo, ui, checker, policies):
 valid_jira_projects = "BUG,DRTVWR,DRTSIM,DRTAPP,DRTDS,DRTDB,DRTCONF,DOC,ESCALATE,SEC,SL,TOOL,WENG".split(",")
 
 def usage():
-    print __doc__
+    print(__doc__)
 
 if __name__ == "__main__":
 
@@ -381,7 +382,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.debug:
-        print "this is coding_policy_git", "args", sys.argv
+        print("this is coding_policy_git", "args", sys.argv)
 
     if args.usage:
         usage()
@@ -406,12 +407,12 @@ if __name__ == "__main__":
             try:
                 with open(policy_file,"r") as fh:
                     policy_name = fh.readline().split()[0]
-                    print "read policy_name", policy_name
+                    print("read policy_name", policy_name)
             except:
-                print "Unable to read policy name from", policy_file
+                print("Unable to read policy name from", policy_file)
 
-    if policy_name not in policy_map.keys():
-        ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map.keys())))
+    if policy_name not in policy_map:
+        ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map)))
         sys.exit(1)
 
     policies = policy_map[policy_name]

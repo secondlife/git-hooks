@@ -1,4 +1,5 @@
 #!/bin/sh
+# Validate https://wiki.secondlife.com/wiki/Coding_Standard
 
 hook_path=${GIT_HOOK_REPO_PATH:-"../git-hooks"}
 exec "${hook_path}/coding_policy_git.py" --commit-msg "$1"

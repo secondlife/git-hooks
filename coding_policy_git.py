@@ -1,5 +1,44 @@
 #!/usr/bin/env python
 
+"""\
+This script is used for checking commits and files against the Linden coding policy.
+
+To use with git commit hooks:
+- From your repo, run the git-hooks/install script. This will create pre-commit and commit-msg hooks that refer to this script.
+- Install any necessary python modules via pip. "pip -r git-hooks/requirements.txt" should pick up any that are needed.
+- Run "git commit" as usual.
+
+To use to check some or all files manually:
+coding_policy_git.py [--policy opensource|proprietary] [--pre-commit] [--all_files] [file...]
+--policy specifies the policy to use. Defaults to opensource. If not specified by by --policy and a .git_hooks_policy file is found in repo root, we will use the contents of that as the policy.
+--all_files will check all managed files in the current working tree
+Any arguments at the end are treated as individual file names to check
+"""
+
+license = """\
+
+$LicenseInfo:firstyear=2020&license=viewerlgpl$
+Second Life Viewer Source Code
+Copyright (C) 2020, Linden Research, Inc.
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation;
+version 2.1 of the License only.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
+$/LicenseInfo$
+"""
+
 import os
 import sys
 try:
@@ -11,13 +50,13 @@ except:
 import re
 import argparse
 
-# from mercurial.utils.stringutil. This is not a great binary checker
+# From mercurial.utils.stringutil. This is not a great binary checker
 # but seems to work well enough in our environment.
 def binary(s):
     """return true if a string is binary data"""
     return bool(s and b'\0' in s)
 
-# escape sequences for colored text, lifted from https://stackoverflow.com/questions/287871
+# ANSI escape sequences for colored text, from https://stackoverflow.com/questions/287871
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -193,6 +232,7 @@ policy_map = {
     }
 
 # (Following is old hg-based code, not currently supported)
+#
 # We identify a repository that is subject to checking by whitelist,
 # based on the ID of the first changeset in that repository.  Here's a
 # simple way to obtain the necessary changeset ID:
@@ -325,15 +365,8 @@ def pre_commit_check(repo, ui, checker, policies):
 
 valid_jira_projects = "BUG,DRTVWR,DRTSIM,DRTAPP,DRTDS,DRTDB,DRTCONF,DOC,ESCALATE,SEC,SL,TOOL,WENG".split(",")
 
-usage_message = '''
-Usage: coding_policy_git.py [--policy opensource|proprietary] [--pre-commit] [--all_files] [file...]
---policy specifies the policy to use, defaults to opensource. Otherwise, if a .git_hooks_policy file is found in repo root, we will use the contents of that as policy.
---all_files will check all managed files in the current working tree
-Any arguments at the end are treated as individual file names to check
-'''
-
 def usage():
-    print usage_message
+    print __doc__
 
 if __name__ == "__main__":
 
@@ -356,8 +389,8 @@ if __name__ == "__main__":
 
     # find root of current repo
     cwd = os.getcwd()
-    cwd = Git(cwd).rev_parse("--show-toplevel")
-    repo = Repo(cwd)
+    rootdir = Git(cwd).rev_parse("--show-toplevel")
+    repo = Repo(rootdir)
 
     ui = checker_ui()
     ui.debug_flag = args.debug
@@ -403,10 +436,12 @@ if __name__ == "__main__":
 
     if args.all_files:
         # check all managed files in the current working tree
-        g = Git(cwd)
-        rval = g.ls_files()
+        ui.note("checking all managed files")
+        g = Git(rootdir)
+        files = g.ls_files().split("\n")
+        files = [os.path.join(rootdir,f) for f in files]
         file_checker = checker(ui, None, policies)
-        file_checker.check_files(rval.split("\n"))
+        file_checker.check_files(files)
         file_checker.done()
         if file_checker.violations:
             ui.warn("--all_file check violations found: %d" % (file_checker.violations))

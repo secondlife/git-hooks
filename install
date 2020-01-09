@@ -4,7 +4,7 @@ hook_path=${GIT_HOOK_REPO_PATH:-"../git-hooks"}
 echo $hook_path
 
 pushd $(git rev-parse --show-toplevel)
-if [ ! -d .git/hooks ] || [ -e coding_policy_git.py ]; then
+if [ ! -d .git/hooks ]; then
     echo "not a valid repo"
     exit 1
 fi

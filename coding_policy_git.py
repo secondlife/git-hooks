@@ -242,13 +242,18 @@ policy_map = {
 # Note that this lookup can be overridden (see repo_policy_name below)
 repo_roots = (
     # format: ('helpful description', 'changeset ID', 'policy')
-    ('hg-tools', 'c3a2af7065cfdf857798e47ae741fb41c13ceb1d', 'opensource'),
+
+    # FIXME: hg repos. Won't work as-is, need to update the ids once these are ported
     ('autobuild', '150af56aeda147f2bcaf2058cc591446c62a60b1', 'opensource'),
     ('convexdecomposition', '15eca2f72654f693292c0473b910d0b75f5c63e8', 'proprietary'),
     ('convexdecompositionstub', '4522adf7908d480e4773be7811429419c951fac8', 'opensource'),
     ('internal indra', '01da24a6ed088e1519f98a56f03bf7e5d270a552', 'proprietary'),
     ('viewer-development', '003dd9461bfa479049afcc34545ab3431b147c7c', 'opensource'),
     ('llphysicsextensions', '8b92acd6e747b81af331159b36e7ae91c7725f59', 'proprietary'),
+
+    # git repos
+    ('indra-server', '137f6caec9396a8bae02ec421e14106fb7232338', 'proprietary'),
+    ('viewer', '420b91db29485df39fd6e724e782c449158811cb', 'opensource'),
     )
 
 # ================ End of policy control variables ================
@@ -395,11 +400,10 @@ if __name__ == "__main__":
     ui = checker_ui()
     ui.debug_flag = args.debug
 
-    # TODO get policy automatically
-    policy_name = 'opensource'
+    policy_name = None
     if args.policy:
         policy_name = args.policy
-    else:
+    if not policy_name:
         # check for .git_hooks_policy in repo root
         policy_file = os.path.join(repo.working_tree_dir,".git_hooks_policy")
         if os.path.isfile(policy_file):
@@ -409,6 +413,18 @@ if __name__ == "__main__":
                     print "read policy_name", policy_name
             except:
                 print "Unable to read policy name from", policy_file
+    if not policy_name:
+        # check for known repo using commit id
+        for (name, commit_id, policy) in repo_roots:
+            try:
+                commit = repo.rev_parse(commit_id)
+                print("match for name", name, "policy is", policy)
+                policy_name = policy
+            except:
+                pass
+    if not policy_name:
+        print("no policy name found, assuming opensource")
+        policy_name = "opensource"
 
     if policy_name not in policy_map.keys():
         ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map.keys())))

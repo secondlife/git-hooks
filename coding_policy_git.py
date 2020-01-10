@@ -324,18 +324,18 @@ class checker(object):
     def check_commit_msg(self, msg):
         # check for valid JIRA links
         found_jira = False
-        status = 0
+        if "merge" in msg.lower():
+            # merges do not need to specify a JIRA
+            return
         for m in re.finditer(r'([a-zA-Z]+)-(\d+)', msg):
             proj = m.group(1).upper()
             if not proj in valid_jira_projects:
                 self.ui.warn("Commit message has unrecognized JIRA project %s (in %s)" % (proj, m.group()))
                 self.violations += 1
-                status = 1
             else:
                 found_jira = True
         if not found_jira:
             self.ui.warn("Commit message contains no valid JIRAs")
-            status = 1
             self.violations += 1
 
     def done(self):

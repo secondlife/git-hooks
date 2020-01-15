@@ -44,18 +44,19 @@ import os
 import sys
 try:
     from git import Repo, Git # requires the gitpython package
-except:
+except ImportError:
     print("this script requires the gitpython package")
     sys.exit(1)
-    
-import re
+
 import argparse
+import re
 
 # From mercurial.utils.stringutil. This is not a great binary checker
 # but seems to work well enough in our environment.
 def binary(s):
     """return true if a string is binary data"""
-    return bool(s and b'\0' in s)
+    # in Python 3, 'in' requires same type on both sides: bytes or str
+    return bool(s) and ((b'\0' if isinstance(s, bytes) else '\0') in s)
 
 # ANSI escape sequences for colored text, from https://stackoverflow.com/questions/287871
 class bcolors(object):
@@ -96,6 +97,28 @@ def rx(regexp):
     compiled = re.compile(regexp)
     return lambda string: bool(compiled.search(string, re.IGNORECASE))
 
+def raw(data_bytes):
+    """
+    no-op decoder for validations that want raw binary data from file
+    """
+    return data_bytes
+
+def utf8(data_bytes):
+    """
+    UTF-8 decoder for validations that want ordinary decoded text
+
+    n.b. the 'utf8' codec leaves '\r\n' unchanged, unlike open(mode='r')
+    """
+    return data_bytes.decode('utf8')
+
+def utf16(data_bytes):
+    """
+    UTF-16 decoder for validations against UTF16 files, e.g. NSIS source
+
+    n.b. the 'utf16' codec knows enough to skip initial BOM header bytes
+    """
+    return data_bytes.decode('utf16')
+
 class validation(object):
     """
     Decorator to register a validation function in a particular policy
@@ -110,14 +133,18 @@ class validation(object):
     registers valid_xml() in the common_policies list with a predicate
     function that matches the file's pathanme against the specified regular
     expression.
+
+    Also pass (e.g.) decoder=raw or decoder=utf16 for validation functions
+    that want the file data in some alternative form.
     """
-    def __init__(self, policies, predicate):
+    def __init__(self, policies, predicate, decoder=utf8):
         self.policies  = policies
         self.predicate = predicate
+        self.decoder   = decoder
 
     def __call__(self, func):
-        # each policies list consists of (name, predicate, function) triples
-        self.policies.append((func.__name__, self.predicate, func))
+        # each policies list consists of (predicate, decoder, function) triples
+        self.policies.append((self.predicate, self.decoder, func))
         return func
 
 # ------------------------- Policy check registries --------------------------
@@ -308,13 +335,47 @@ class checker(object):
         self.seen = set()
     
     def check_file(self, f, data) :
-        self.ui.debug('  checking %s\n' % f)
-        for name, predicate, policy in self.policies:
+        # 'data' is bytes
+        self.ui.debug('  checking %s' % f)
+
+        # Typically, more than one policy function specifies the same decoder.
+        # Cache decoded results here so we don't have to keep passing 'data'
+        # through the same decoder function over and over again. (See also
+        # functools.lru_cache, available only in Python 3.)
+        cache = {}
+
+        for predicate, decoder, policy in self.policies:
+            name = policy.__name__
             # predicate is a callable
             if not predicate(f.lower()):
                 continue
-            self.ui.debug('    '+name+'\n')
-            for violation in policy(f, data):
+
+            violations = []
+            # have we already run this decoder?
+            try:
+                decoded = cache[decoder.__name__]
+            except KeyError:
+                try:
+                    decoded = decoder(data)
+                except Exception as err:
+                    # If we can't decode file content according to the policy
+                    # function's specified decoder, that's the only error we
+                    # can surface for this policy function.
+                    violations = [(f, ('%s: %s' % (err.__class__.__name__, err)))]
+                    # cache a dud result so we won't later retry the same decoder
+                    decoded = None
+
+                # either way, cache result for subsequent uses of same decoder
+                cache[decoder.__name__] = decoded
+
+            # 'decoded' might be cached as None, in which case a previous
+            # attempt to run the same decoder already produced the error
+            if decoded:
+                # but if it's real, call the policy generator
+                violations = policy(f, decoded)
+
+            self.ui.debug('    '+name)
+            for violation in violations:
                 # Doesn't work with git; commit message not known during pre-commit check.
                 #magic = 'warn-on-failure:' + name
                 #warning = magic in desc
@@ -331,11 +392,16 @@ class checker(object):
     def check_files(self, files):
         for f in files:
             try:
+                # certain validations require reading the file as binary --
+                # for instance, we can't detect '\r\n' line endings in text
+                # mode ("r") because Python maps all such to plain '\n'
                 with open(f,"rb") as fh:
                     data = fh.read()
-                    self.check_file(f, data)
-            except:
-                self.ui.note("unable to read file %s" % (f))
+            except Exception as err:
+                self.ui.note("unable to read file %s: %s: %s" %
+                             (f, err.__class__.__name__, err))
+            else:
+                self.check_file(f, data)
                 
     def check_commit_msg(self, msg):
         # check for valid JIRA links
@@ -429,8 +495,9 @@ if __name__ == "__main__":
                 with open(policy_file,"r") as fh:
                     policy_name = fh.readline().split()[0]
                     print("read policy_name", policy_name)
-            except:
-                print("Unable to read policy name from", policy_file)
+            except (IOError, OSError) as err:
+                print("Unable to read policy name from '%s': %s: %s" %
+                      (policy_file, err.__class__.__name__, err))
 
     if policy_name not in policy_map:
         ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map)))
@@ -448,7 +515,7 @@ if __name__ == "__main__":
     if args.commit_msg:
         ui.debug("commit-msg check, file %s" % args.commit_msg)
         msg_checker = checker(ui, None, policies)
-        with open(args.commit_msg,"rb") as fh:
+        with open(args.commit_msg,"r") as fh:
             msg = fh.read()
             msg_checker.check_commit_msg(msg)
             errs = msg_checker.done()

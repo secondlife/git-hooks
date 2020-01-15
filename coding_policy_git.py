@@ -293,7 +293,7 @@ def last_line_ends_with_eol(path, data):
     if data and data[-1] != '\n':
         yield 'last line does not end with EOL'
 
-@validation(common_policies, rx(r'\.xml$'))
+@validation(common_policies, rx(r'\.xml$'), decoder=raw)
 def valid_xml(path, data):
     import xml.etree.ElementTree as parser
     # We don't yet try to validate against a DTD, merely to ensure

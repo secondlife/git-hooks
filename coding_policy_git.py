@@ -96,8 +96,9 @@ def rx(regexp):
     If the predicate you want is to match the pathname of the file being tested
     against a particular regexp, pass rx(r'your regexp') as the callable.
     """
-    compiled = re.compile(regexp)
-    return lambda string: bool(compiled.search(string, re.IGNORECASE))
+    compiled = re.compile(regexp, re.IGNORECASE)
+    # return the compiled regexp's search() method
+    return compiled.search
 
 def raw(data_bytes, **kwds):
     """

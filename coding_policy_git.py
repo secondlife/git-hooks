@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/Users/nat/virtualenvs/git-hooks/bin/python
 
 """\
 This script is used for checking commits and files against the Linden coding policy.
@@ -49,6 +49,8 @@ except ImportError:
     sys.exit(1)
 
 import argparse
+import chardet
+import itertools
 import re
 
 # From mercurial.utils.stringutil. This is not a great binary checker
@@ -97,27 +99,54 @@ def rx(regexp):
     compiled = re.compile(regexp)
     return lambda string: bool(compiled.search(string, re.IGNORECASE))
 
-def raw(data_bytes):
+def raw(data_bytes, **kwds):
     """
     no-op decoder for validations that want raw binary data from file
     """
     return data_bytes
 
-def utf8(data_bytes):
+def maybe_text(data_bytes, **kwds):
+    """
+    decoder for use when a file might be binary or might be text in some
+    encoding yet to be determined
+
+    n.b. If a decoder returns None, checker.check_file() skips the policy
+    function call.
+    """
+    if binary(data_bytes):
+        # if we already think it's a binary file, don't bother trying to decode
+        return None
+
+    try:
+        # chardet makes guesses -- sometimes it guesses wrong about files we
+        # know should be UTF-8
+        return data_bytes.decode('utf8')
+    except UnicodeDecodeError as err:
+        pass
+
+    # UTF-8 didn't work, let chardet take a swing at it
+    coding = chardet.detect(data_bytes)
+    if not coding['encoding']:
+        # if chardet can't figure out what kind of file it is, probably binary
+        return None
+    # but if chardet thinks it has figured out the encoding, try that
+    return data_bytes.decode(coding['encoding'], **kwds)
+
+def utf8(data_bytes, **kwds):
     """
     UTF-8 decoder for validations that want ordinary decoded text
 
     n.b. the 'utf8' codec leaves '\r\n' unchanged, unlike open(mode='r')
     """
-    return data_bytes.decode('utf8')
+    return data_bytes.decode('utf8', **kwds)
 
-def utf16(data_bytes):
+def utf16(data_bytes, **kwds):
     """
     UTF-16 decoder for validations against UTF16 files, e.g. NSIS source
 
     n.b. the 'utf16' codec knows enough to skip initial BOM header bytes
     """
-    return data_bytes.decode('utf16')
+    return data_bytes.decode('utf16', **kwds)
 
 class validation(object):
     """
@@ -169,14 +198,14 @@ def last_line_should_have_eol(name) :
 
 # ================ Start of policy check methods ================
 
-@validation(common_policies, lambda p: not is_windows_only_file(p))
+@validation(common_policies, lambda p: not is_windows_only_file(p), decoder=maybe_text)
 def unix_line_endings(path, data):
-    if not binary(data) and '\r\n' in data:
+    if '\r\n' in data:
         yield 'Windows line endings found'
 
-@validation(common_policies, is_windows_only_file)
+@validation(common_policies, is_windows_only_file, decoder=maybe_text)
 def windows_line_endings(path, data):
-    if not binary(data) and re.search('(?<!\r)\n', data, re.MULTILINE):
+    if re.search('(?<!\r)\n', data, re.MULTILINE):
         yield 'Unix line endings found'
 
 @validation(common_policies, rx(r'\.(?:cpp|[ch]|py|glsl)$'))
@@ -273,7 +302,8 @@ def valid_xml(path, data):
     except parser.ParseError as parse_error :
        yield 'invalid XML: %s' % parse_error.msg 
 
-@validation(common_policies, rx(r'\.xml$'))
+# llsd.parse() expects bytes, not str
+@validation(common_policies, rx(r'\.xml$'), decoder=raw)
 def valid_llsd(path, data):
     import xml.etree.ElementTree as parser
     try :
@@ -350,7 +380,7 @@ class checker(object):
             if not predicate(f.lower()):
                 continue
 
-            violations = []
+            decode_errs = []
             # have we already run this decoder?
             try:
                 decoded = cache[decoder.__name__]
@@ -359,23 +389,21 @@ class checker(object):
                     decoded = decoder(data)
                 except Exception as err:
                     # If we can't decode file content according to the policy
-                    # function's specified decoder, that's the only error we
-                    # can surface for this policy function.
-                    violations = [(f, ('%s: %s' % (err.__class__.__name__, err)))]
-                    # cache a dud result so we won't later retry the same decoder
-                    decoded = None
+                    # function's specified decoder, capture that error.
+                    decode_errs = [(f, ('%s: %s' % (err.__class__.__name__, err)))]
+                    # but then retry, suppressing the error so we can still
+                    # run the policy check
+                    decoded = decoder(data, errors='replace')
 
                 # either way, cache result for subsequent uses of same decoder
                 cache[decoder.__name__] = decoded
 
-            # 'decoded' might be cached as None, in which case a previous
-            # attempt to run the same decoder already produced the error
-            if decoded:
-                # but if it's real, call the policy generator
-                violations = policy(f, decoded)
+            # 'decoded' might be None, meaning the decoder says to skip the
+            # policy function
+            generator = policy(f, decoded) if decoded else []
 
             self.ui.debug('    '+name)
-            for violation in violations:
+            for violation in itertools.chain(decode_errs, generator):
                 # Doesn't work with git; commit message not known during pre-commit check.
                 #magic = 'warn-on-failure:' + name
                 #warning = magic in desc

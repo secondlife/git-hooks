@@ -1,4 +1,4 @@
-#!/Users/nat/virtualenvs/git-hooks/bin/python
+#!/usr/bin/env python
 
 """\
 This script is used for checking commits and files against the Linden coding policy.

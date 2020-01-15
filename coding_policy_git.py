@@ -543,11 +543,12 @@ if __name__ == "__main__":
         print("no policy name found, assuming opensource")
         policy_name = "opensource"
 
-    if policy_name not in policy_map:
-        ui.warn("unrecognized policy %s, known policies are: %s" % (args.policy, ", ".join(policy_map)))
+    try:
+        policies = policy_map[policy_name]
+    except KeyError:
+        ui.warn("unrecognized policy %s, known policies are: %s" %
+                (policy_name, ", ".join(policy_map)))
         sys.exit(1)
-
-    policies = policy_map[policy_name]
 
     if args.pre_commit:
         commit_checker = checker(ui, None, policies)

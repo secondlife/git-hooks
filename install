@@ -1,13 +1,31 @@
-#!/bin/sh
+#!/bin/bash
 
-hook_path=${GIT_HOOK_REPO_PATH:-"../git-hooks"}
-echo $hook_path
+set -x
 
-pushd $(git rev-parse --show-toplevel)
+# In what directory is this script stored? (Expand to full pathname.)
+hook_path="$(cd "$(dirname "$BASH_SOURCE")" ; pwd)"
+
+# If the user passed a repository pathname, go there.
+[ -n "$1" ] && cd "$1"
+
+# Whether or not the user passed a repository path, go to repo root.
+cd "$(git rev-parse --show-toplevel)"
 if [ ! -d .git/hooks ]; then
-    echo "not a valid repo"
+    echo "$1 not a valid repo" 1>&2
     exit 1
 fi
 #env
-echo "installing hooks in current repo",$PWD
-cp -v ${hook_path}/hooks/{pre-commit,commit-msg} .git/hooks
+echo "installing hooks in repo $PWD"
+#cp -v ${hook_path}/hooks/{pre-commit,commit-msg} .git/hooks
+
+cat > .git/hooks/pre-commit <<EOF
+#!/bin/sh
+exec "${hook_path}/coding_policy_git.py" --pre-commit
+EOF
+
+cat > .git/hooks/commit-msg <<EOF
+#!/bin/sh
+exec "${hook_path}/coding_policy_git.py" --commit-msg "\$1"
+EOF
+
+chmod +x .git/hooks/{pre-commit,commit-msg}

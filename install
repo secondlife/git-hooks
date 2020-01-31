@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -x
-
 # In what directory is this script stored? (Expand to full pathname.)
 hook_path="$(cd "$(dirname "$BASH_SOURCE")" ; pwd)"
 
@@ -16,7 +14,6 @@ if [ ! -d .git/hooks ]; then
 fi
 #env
 echo "installing hooks in repo $PWD"
-#cp -v ${hook_path}/hooks/{pre-commit,commit-msg} .git/hooks
 
 cat > .git/hooks/pre-commit <<EOF
 #!/bin/sh

@@ -3,6 +3,11 @@
 # In what directory is this script stored? (Expand to full pathname.)
 hook_path="$(cd "$(dirname "$BASH_SOURCE")" ; pwd)"
 
+if which cygpath >/dev/null
+then # On Windows, with cygwin bash, convert to native Windows form
+     hook_path="$(cygpath -m "$hook_path")"
+fi
+
 # If the user passed a repository pathname, go there.
 [ -n "$1" ] && cd "$1"
 

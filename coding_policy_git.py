@@ -480,9 +480,10 @@ def pre_commit_check(repo, ui, checker, policies):
     for d in repo.index.diff(repo.head.commit):
         if d.change_type in ['A','M', 'R']: # skip 'D' for delete
             filename = d.a_path
-            data = d.a_blob.data_stream.read()
-            change_type = d.change_type
-            checker.check_file(filename, data)
+            blob = d.a_blob
+            if blob is not None:
+                data = blob.data_stream.read()
+                checker.check_file(filename, data)
     checker.done()
 
 valid_jira_projects = "BUG,DRTVWR,DRTSIM,DRTAPP,DRTDS,DRTDB,DRTCONF,DOC,ESCALATE,SEC,SL,TOOL,WENG".split(",")

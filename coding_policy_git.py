@@ -581,7 +581,8 @@ if __name__ == "__main__":
         file_checker.done()
         if file_checker.violations:
             ui.warn("--all_file check violations found: %d" % (file_checker.violations))
-        
+            sys.exit(1)
+
     if args.files:
         ui.note("checking files from command line " + ", ".join(args.files))
         file_checker = checker(ui, None, policies)
@@ -589,4 +590,4 @@ if __name__ == "__main__":
         file_checker.done()
         if file_checker.violations:
             ui.warn("file check violations found: %d" % (file_checker.violations))
-
+            sys.exit(1)

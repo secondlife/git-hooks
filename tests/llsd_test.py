@@ -1,14 +1,15 @@
+# -*- coding: UTF-8 -*-
 import pytest
-import tempfile
 
 from git_hooks.llsd import main
+from .support import temporary_file
 
 
-VALID_LLSD = """<?xml version="1.0" encoding="UTF-8"?>
+VALID_LLSD = u"""<?xml version="1.0" encoding="UTF-8"?>
 <llsd>
   <map>
     <key>foo</key>
-    <string>bar</string>
+    <string>💻</string>
   </map>
 </llsd>
 """
@@ -36,8 +37,8 @@ VALID_XML = """<?xml version="1.0" encoding="UTF-8"?>
     ),
 )
 def test_main(text, expected_status):
-    with tempfile.NamedTemporaryFile(mode="w") as tmp:
-        tmp.write(text)
-        tmp.seek(0)
+    with temporary_file(mode="wb") as tmp:
+        tmp.write(text.encode("utf-8"))
+        tmp.close()
         status = main([tmp.name])
         assert status == expected_status

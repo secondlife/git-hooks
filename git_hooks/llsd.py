@@ -1,35 +1,49 @@
 from __future__ import print_function
 import argparse
-from xml.etree import ElementTree
+import xml.sax.handler
 
 from llbase import llsd
 
 from .util import eprint
 
 
+class LLSDNotFoundException(Exception):
+    pass
+
+
+class LLSDFoundException(Exception):
+    pass
+
+
+class IsThisLLSD(xml.sax.ContentHandler):
+    def startElement(self, name, attrs):
+        if name == "llsd":
+            raise LLSDFoundException()
+        raise LLSDNotFoundException()
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("filenames", nargs="*", help="Filenames to check")
+    parser.add_argument("filenames", nargs="*", help="LLSD/XML files to check")
     args = parser.parse_args(argv)
 
     invalid_llsd = False
+    handler = IsThisLLSD()
     for filename in args.filenames:
-        with open(filename) as f:
-            text = f.read()
-            try:
-                root = ElementTree.fromstring(text)
-            except ElementTree.ParseError:
-                # Allow invalid XML to be caught by XML check
-                continue
-
-            if root.tag != "llsd":
-                continue
-
-            try:
-                llsd.parse(text.encode())
-            except Exception as e:
-                eprint("{}: Error parsing llsd, {}".format(filename, e))
-                invalid_llsd = True
+        # SAX will close this file on exception
+        xml_file = open(filename, "rb")
+        try:
+            xml.sax.parse(xml_file, handler)
+        except (xml.sax.SAXException, LLSDNotFoundException):
+            # Allow invalid XML to be caught by an XML syntax check
+            continue
+        except LLSDFoundException:
+            with open(filename, "rb") as llsd_file:
+                try:
+                    llsd.parse(llsd_file.read())
+                except Exception as e:
+                    eprint("{}: Error parsing llsd, {}".format(filename, e))
+                    invalid_llsd = True
     return int(invalid_llsd)
 
 

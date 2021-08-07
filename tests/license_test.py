@@ -1,7 +1,7 @@
 import pytest
-import tempfile
 
 from git_hooks.license import main
+from .support import temporary_file
 
 LICENSE = """/**
  * @file llfoo.cpp
@@ -41,8 +41,8 @@ LLFoo::LLFoo() : mBar(1)
     ),
 )
 def test_main(text, expected_status):
-    with tempfile.NamedTemporaryFile(mode="w") as tmp:
+    with temporary_file(mode="w") as tmp:
         tmp.write(text)
-        tmp.seek(0)
+        tmp.close()
         status = main([tmp.name])
         assert status == expected_status

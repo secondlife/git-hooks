@@ -1,7 +1,7 @@
 import pytest
-import tempfile
 
 from git_hooks.no_trigraphs import main
+from .support import temporary_file
 
 
 @pytest.mark.parametrize(
@@ -13,8 +13,8 @@ from git_hooks.no_trigraphs import main
     ),
 )
 def test_main(text, expected_status):
-    with tempfile.NamedTemporaryFile(mode="w") as tmp:
+    with temporary_file(mode="w") as tmp:
         tmp.write(text)
-        tmp.seek(0)
+        tmp.close()
         status = main([tmp.name])
         assert status == expected_status

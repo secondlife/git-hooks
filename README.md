@@ -2,13 +2,38 @@
 
 A collection of [pre-commit][] scripts used for checking commits and files against [Linden coding standards][standards].
 
-## Use 
+## Use
 
 **Requirements:**
 
 - [pre-commit][] - an open source program for managing git pre-commit behavior
 
-You should have [pre-commit][] installed on your machine. After doing so, you can run `pre-commit install` in any git project containing a `.pre-commit-config.yaml` file to install hooks and dependencies.
+You should have [pre-commit][] installed on your machine. Be sure you have your user-level Python Scripts directory on your `PATH`. ex. `C:\Users\USERNAME\Roaming\Python\Python39\Scripts` on Windows or `~/.local/bin` everywhere else. After doing so, you can run `pre-commit install` in any git project containing a `.pre-commit-config.yaml` file to install hooks and dependencies.
+
+### Instructions for Second Life Viewer Development
+
+Checkout the [viewer][] as normal. Then run:
+
+```text
+pre-commit install -f
+pre-commit install -f -t commit-msg
+```
+
+If you need to manually run any hooks, you can do so:
+
+Run a specific hook (by ID) over all files
+```text
+pre-commit run --all-files opensource-license 
+```
+
+Run all hooks over all files
+```text
+pre-commit run --all-files
+```
+
+### Configuration File
+
+To add these hooks to your own repository create a `.pre-commit-config.yaml` file in its root:
 
 Example `.pre-commit-config.yaml`:
 ```yaml
@@ -17,7 +42,7 @@ repos:
     rev: v1.0.0
     hooks:
       - id: opensource-license
-      - id: jira-issue 
+      - id: jira-issue
       - id: llsd
       - id: indent-with-spaces
       - id: indent-with-tabs
@@ -53,14 +78,11 @@ cd git-hooks
 # Install the project using pip. This requires that $HOME/.local/bin is on your path
 pip install .
 
-# Run checks manually 
+# Run checks manually
 check-linden-copyright [PATH TO FILE]
 ```
 
 See `setup.cfg`'s `[options.entry_points]` for a full list of scripts.
-
-[standards]: https://wiki.secondlife.com/wiki/Coding_standard
-[pre-commit]: https://pre-commit.com/
 
 ### Development
 
@@ -68,4 +90,9 @@ To set up your development environment run
 
 ```text
 pip install -e .[dev]
+pre-commit install
 ```
+
+[standards]: https://wiki.secondlife.com/wiki/Coding_standard
+[pre-commit]: https://pre-commit.com/
+[viewer]: https://bitbucket.org/lindenlab/viewer

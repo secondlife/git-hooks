@@ -1,0 +1,48 @@
+- id: jira-issue
+  name: Commit Has Jira Issue 
+  description: Check commit message for a recognized Jira issue 
+  entry: check-linden-jira-issue
+  language: python
+  stages: [commit-msg]
+- id: opensource-license 
+  name: Code Has Opensource License 
+  description: Check code files for a valid opensource license header
+  entry: check-linden-opensource-license 
+  files: \.(?:cpp|c|h|py|glsl)$
+  language: python
+- id: license 
+  name: Code Has License 
+  description: Check code files for a valid internal/proprietary license header
+  entry: check-linden-license 
+  files: \.(?:cpp|c|h|py|glsl|sh|bat|pl)$
+  language: python
+- id: llsd
+  name: Check LLSD
+  description: Check LLSD files for parseable syntax
+  entry: check-llsd
+  types: [xml]
+  language: python
+- id: indent-with-spaces 
+  name: Check Indentation (Spaces)
+  description: Check if files that should be indented with spaces are 
+  entry: check-linden-indent-with-spaces 
+  types: [cmake, python]
+  language: python
+- id: indent-with-tabs
+  name: Check Indentation (Tabs)
+  description: Checks if files that should be indented with tabs are 
+  entry: check-linden-indent-with-tabs
+  files: (?:^[Mm]akefile|\.make)$
+  language: python
+- id: no-trigraphs 
+  name: Check for Trigraphs 
+  description: Search c/c++ code for trigraphs, see https://wiki.secondlife.com/wiki/Coding_Standard#Trigraphs  
+  entry: check-linden-no-trigraphs 
+  files: \.(?:cpp|c|h)$
+  language: python
+- id: copyright 
+  name: Copyright 
+  description: Check for copyright notice 
+  entry: check-linden-copyright 
+  files: \.(?:cpp|c|h|py|glsl)$ 
+  language: python

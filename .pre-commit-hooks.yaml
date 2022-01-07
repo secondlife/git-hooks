@@ -46,3 +46,9 @@
   entry: check-linden-copyright 
   files: \.(?:cpp|c|h|py|glsl)$ 
   language: python
+- id: end-of-file
+  name: Fix end of files
+  description: Ensure file is empty or ends in newline
+  entry: check-end-of-file
+  language: python
+  types: [text]

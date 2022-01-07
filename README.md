@@ -1,4 +1,4 @@
-# Linden Lab Pre-commit Hooks
+ Linden Lab Pre-commit Hooks
 
 A collection of [pre-commit][] scripts used for checking commits and files against [Linden coding standards][standards].
 
@@ -23,7 +23,7 @@ If you need to manually run any hooks, you can do so:
 
 Run a specific hook (by ID) over all files
 ```text
-pre-commit run --all-files opensource-license 
+pre-commit run --all-files opensource-license
 ```
 
 Run all hooks over all files
@@ -38,27 +38,28 @@ To add these hooks to your own repository create a `.pre-commit-config.yaml` fil
 Example `.pre-commit-config.yaml`:
 ```yaml
 repos:
-  - repo: https://bitbucket.org/lindenlab/git-hooks
-    rev: v1.0.0
+  - repo: https://bitbucket.org/lindenlab/git-hooks.git
+    rev: v1.0.0-beta2
     hooks:
       - id: opensource-license
       - id: jira-issue
       - id: llsd
-      - id: indent-with-spaces
-      - id: indent-with-tabs
       - id: no-trigraphs
       - id: copyright
+      - id: end-of-file
+        files: \.(cpp|c|h|py|glsl|cmake|txt)$
+        exclude: language.txt
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.1.0
     hooks:
       - id: check-xml
-      - id: end-of-file-fixer
       - id: mixed-line-ending
 ```
 
 ### Provided hooks
 
 - `copyright` - Check code for a copyright notice
+- `end-of-file` - Check and fix any files that do not end in a newline.
 - `indent-with-spaces` - Check if files that should be indented with spaces are (Python, etc.)
 - `indent-with-tabs` - Check if files that should be indented with tabs are (Makefile, etc.)
 - `jira-issue` - Check commit message for a valid Linden Jira ticket number

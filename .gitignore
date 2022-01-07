@@ -3,4 +3,5 @@
 *.swo
 *.swp
 .coverage
-.tox
+.tox/
+build/

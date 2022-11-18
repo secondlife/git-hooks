@@ -1,4 +1,4 @@
- Linden Lab Pre-commit Hooks
+# Linden Lab Pre-commit Hooks
 
 [![codecov](https://codecov.io/gh/secondlife/git-hooks/branch/master/graph/badge.svg?token=GR8A4SWE6C)](https://codecov.io/gh/secondlife/git-hooks)
 

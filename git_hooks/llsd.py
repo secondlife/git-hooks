@@ -2,7 +2,7 @@ from __future__ import print_function
 import argparse
 import xml.sax.handler
 
-from llbase import llsd
+import llsd
 
 from .util import eprint
 

@@ -5,4 +5,5 @@
 coverage.xml
 .coverage
 .tox/
+.venv/
 build/

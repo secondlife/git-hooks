@@ -1,5 +1,7 @@
  Linden Lab Pre-commit Hooks
 
+[![codecov](https://codecov.io/gh/secondlife/git-hooks/branch/master/graph/badge.svg?token=GR8A4SWE6C)](https://codecov.io/gh/secondlife/git-hooks)
+
 A collection of [pre-commit][] scripts used for checking commits and files against [Linden coding standards][standards].
 
 ## Use

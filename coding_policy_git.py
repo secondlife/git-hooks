@@ -51,6 +51,7 @@ except ImportError:
 import argparse
 import chardet
 import itertools
+from pathlib import Path
 import re
 
 # From mercurial.utils.stringutil. This is not a great binary checker
@@ -513,7 +514,24 @@ if __name__ == "__main__":
     # find root of current repo
     cwd = os.getcwd()
     rootdir = Git(cwd).rev_parse("--show-toplevel")
-    repo = Repo(rootdir)
+    # Bug in gitpython's git.Git? On a cygwin system, 'rootdir' might be
+    # something crazy like D:\cygdrive\d\work\Viewer\viewer_W64\latest .
+    # This produces NoSuchPathError when passed to git.Repo below.
+    # Try to de-cygwinify rootdir.
+    rootdir = Path(rootdir)
+    # Use slice notation because if rootdir happens to be (e.g.) 'C:\',
+    # rootdir.parts[1] raises IndexError, while [1:2] returns ().
+    # ('parts' is documented to be a tuple.)
+    # If rootdir is plain '\cygdrive\d\...', then rootdir.drive is ''.
+    # If it's 'D:\cygdrive\d\...', verify that 'D:' matches 'd'.
+    if (rootdir.parts[1:2] == ('cygdrive',) and
+        ((not rootdir.drive) or
+         (rootdir.drive.lower()[0] == rootdir.parts[2].lower()))):
+        # Keep the drive letter, but skip the 'cygdrive', 'd' parts.
+        rootfixed = Path(rootdir.anchor, *rootdir.parts[3:])
+        print(f'Fixing cygwin {rootdir} to {rootfixed}')
+        rootdir = rootfixed
+    repo = Repo(str(rootdir))
 
     ui = checker_ui()
     ui.debug_flag = args.debug
@@ -523,8 +541,8 @@ if __name__ == "__main__":
         policy_name = args.policy
     if not policy_name:
         # check for .git_hooks_policy in repo root
-        policy_file = os.path.join(repo.working_tree_dir,".git_hooks_policy")
-        if os.path.isfile(policy_file):
+        policy_file = Path(repo.working_tree_dir)/".git_hooks_policy"
+        if policy_file.is_file():
             try:
                 with open(policy_file,"r") as fh:
                     policy_name = fh.readline().split()[0]
@@ -573,9 +591,9 @@ if __name__ == "__main__":
     if args.all_files:
         # check all managed files in the current working tree
         ui.note("checking all managed files")
-        g = Git(rootdir)
+        g = Git(str(rootdir))
         files = g.ls_files().split("\n")
-        files = [os.path.join(rootdir,f) for f in files]
+        files = [str(rootdir / f) for f in files]
         file_checker = checker(ui, None, policies)
         file_checker.check_files(files)
         file_checker.done()

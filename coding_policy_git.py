@@ -532,7 +532,7 @@ if __name__ == "__main__":
                                    encoding='utf8', check=True,
                                    stdout=subprocess.PIPE).stdout.rstrip()
         print(f'Fixing cygwin {rootdir} to {rootfixed}')
-        rootdir = rootfixed
+        rootdir = Path(rootfixed)
     repo = Repo(str(rootdir))
 
     ui = checker_ui()

@@ -53,6 +53,7 @@ import chardet
 import itertools
 from pathlib import Path
 import re
+import subprocess
 
 # From mercurial.utils.stringutil. This is not a great binary checker
 # but seems to work well enough in our environment.
@@ -514,21 +515,17 @@ if __name__ == "__main__":
     # find root of current repo
     cwd = os.getcwd()
     rootdir = Git(cwd).rev_parse("--show-toplevel")
-    # Bug in gitpython's git.Git? On a cygwin system, 'rootdir' might be
-    # something crazy like D:\cygdrive\d\work\Viewer\viewer_W64\latest .
-    # This produces NoSuchPathError when passed to git.Repo below.
-    # Try to de-cygwinify rootdir.
+    # On a cygwin system, 'rootdir' might be something like
+    # \cygdrive\d\work\Viewer\viewer_W64\latest . This produces
+    # NoSuchPathError when passed to git.Repo below. Try to de-cygwinify.
     rootdir = Path(rootdir)
     # Use slice notation because if rootdir happens to be (e.g.) 'C:\',
     # rootdir.parts[1] raises IndexError, while [1:2] returns ().
     # ('parts' is documented to be a tuple.)
-    # If rootdir is plain '\cygdrive\d\...', then rootdir.drive is ''.
-    # If it's 'D:\cygdrive\d\...', verify that 'D:' matches 'd'.
-    if (rootdir.parts[1:2] == ('cygdrive',) and
-        ((not rootdir.drive) or
-         (rootdir.drive.lower()[0] == rootdir.parts[2].lower()))):
-        # Keep the drive letter, but skip the 'cygdrive', 'd' parts.
-        rootfixed = Path(rootdir.anchor, *rootdir.parts[3:])
+    if rootdir.parts[1:2] == ('cygdrive',):
+        rootfixed = subprocess.run(['cygpath', '-m', str(rootdir)],
+                                   encoding='utf8', check=True,
+                                   stdout=subprocess.PIPE).stdout.rstrip()
         print(f'Fixing cygwin {rootdir} to {rootfixed}')
         rootdir = rootfixed
     repo = Repo(str(rootdir))

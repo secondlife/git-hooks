@@ -515,15 +515,20 @@ if __name__ == "__main__":
     # find root of current repo
     cwd = os.getcwd()
     rootdir = Git(cwd).rev_parse("--show-toplevel")
-    # On a cygwin system, 'rootdir' might be something like
-    # \cygdrive\d\work\Viewer\viewer_W64\latest . This produces
+    # Bug in gitpython git.Git? On a cygwin system, 'rootdir' might be
+    # something like '\cygdrive\d\work\Viewer\viewer_W64\latest'. This raises
     # NoSuchPathError when passed to git.Repo below. Try to de-cygwinify.
     rootdir = Path(rootdir)
     # Use slice notation because if rootdir happens to be (e.g.) 'C:\',
     # rootdir.parts[1] raises IndexError, while [1:2] returns ().
     # ('parts' is documented to be a tuple.)
     if rootdir.parts[1:2] == ('cygdrive',):
-        rootfixed = subprocess.run(['cygpath', '-m', str(rootdir)],
+        # The odd path string quoted above is neither fish nor fowl: it is NOT
+        # a proper cygwin path, and cygpath doesn't recognize it as such,
+        # erroneously returning 'C:/cygdrive/d/work/Viewer/viewer_W64/latest'.
+        # Only if we pass '/cygdrive/d/work/Viewer/viewer_W64/latest' does
+        # cygpath recognize it and perform proper conversion.
+        rootfixed = subprocess.run(['cygpath', '-m', rootdir.as_posix()],
                                    encoding='utf8', check=True,
                                    stdout=subprocess.PIPE).stdout.rstrip()
         print(f'Fixing cygwin {rootdir} to {rootfixed}')

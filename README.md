@@ -40,8 +40,8 @@ To add these hooks to your own repository create a `.pre-commit-config.yaml` fil
 Example `.pre-commit-config.yaml`:
 ```yaml
 repos:
-  - repo: https://bitbucket.org/lindenlab/git-hooks.git
-    rev: v1.0.0-beta2
+  - repo: https://github.com/secondlife/git-hooks.git
+    rev: v1.0.0
     hooks:
       - id: opensource-license
       - id: jira-issue

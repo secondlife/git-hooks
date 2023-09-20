@@ -17,6 +17,7 @@ JIRA_PROJECTS = {
     "ESCALATE",
     "SEC",
     "SL",
+    "SRV",
     "TOOL",
     "WENG",
 }

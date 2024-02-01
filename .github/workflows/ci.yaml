@@ -15,4 +15,4 @@ jobs:
     - name: Install dependencies
       run: pip install tox
     - uses: pre-commit/action@v3.0.0
-    - uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v4

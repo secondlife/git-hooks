@@ -26,7 +26,7 @@
   name: Check Indentation (Spaces)
   description: Check if files that should be indented with spaces are 
   entry: check-linden-indent-with-spaces 
-  types: [cmake, python]
+  files: \.(?:cpp|c|h|inl|py|glsl|cmake)$
   language: python
 - id: indent-with-tabs
   name: Check Indentation (Tabs)

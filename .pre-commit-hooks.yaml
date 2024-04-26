@@ -52,3 +52,9 @@
   entry: check-end-of-file
   language: python
   types: [text]
+- id: github-reference
+  name: Commit Has GitHub Reference
+  description: Check commit message for a recognized GitHub reference
+  entry: check-github-reference
+  language: python
+  stages: [commit-msg]
